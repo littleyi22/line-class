@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>班級事務通知小幫手lite版</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --line-green: #06C755;
+      --line-dark: #00B900;
+      --btn-blue: #4A90E2;
+      --btn-dark-green: #048A3B;
+      --bg-gray: #F5F7FA;
+      --text-color: #333;
+    }
+
+    body { font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif; background-color: var(--bg-gray); margin: 0; padding: 0; color: var(--text-color); padding-bottom: 20px; }
+    
+    header { background-color: var(--line-green); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    header h1 { margin: 0; font-size: 18px; font-weight: bold; }
+    .header-btns { display: flex; gap: 8px; }
+    .header-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; }
+    
+    .container { max-width: 600px; margin: 15px auto; padding: 0 15px; }
+    .card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    label { display: block; font-weight: bold; margin-bottom: 8px; color: #555; font-size: 14px; }
+    
+    select, input[type="text"], textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; outline: none; background-color: #FAFAFA; }
+    select { appearance: none; -webkit-appearance: none; }
+    textarea:focus, input[type="text"]:focus { border-color: var(--line-green); background-color: #fff; }
+    
+    .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
+    .student-btn { background-color: white; border: 1px solid #ddd; padding: 10px 5px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.1s; }
+    .student-btn.selected { background-color: var(--line-green); color: white; border-color: var(--line-green); }
+    .btn-no { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .student-btn.selected .btn-no { color: #E0F2F1; }
+    .btn-name { font-size: 16px; font-weight: bold; }
+
+    .btn-whole-class { width: 100%; padding: 12px; border: 2px dashed #ccc; border-radius: 8px; background-color: #fafafa; color: #555; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: all 0.2s; }
+    .btn-whole-class:hover { border-color: var(--line-green); color: var(--line-green); }
+    .btn-whole-class.selected-whole { background-color: var(--line-green); color: white; border: 2px solid var(--line-green); }
+
+    .action-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+    .action-btn { width: 100%; padding: 14px; border: none; border-radius: 8px; color: white; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.1s; }
+    .action-btn:active { transform: scale(0.98); }
+    .btn-copy { background-color: var(--btn-blue); }
+    .btn-line-app { background-color: var(--line-green); }
+    .btn-line-oa { background-color: var(--btn-dark-green); }
+
+    /* Modal & Table 樣式 (加寬以容納表格) */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; justify-content: center; align-items: center; }
+    .modal-content { background: white; width: 95%; max-width: 800px; max-height: 90vh; border-radius: 12px; padding: 20px; overflow-y: auto; box-sizing: border-box; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .modal-header h2 { margin: 0; font-size: 18px; color: var(--line-dark); }
+    .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #888; }
+    
+    /* 表格樣式 */
+    .table-container { max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 400px; }
+    th { background-color: #f4f4f4; padding: 10px; text-align: left; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; }
+    td { padding: 5px; border-bottom: 1px solid #eee; }
+    td input { padding: 8px; font-size: 14px; border: 1px solid transparent; background: transparent; }
+    td input:focus { border: 1px solid var(--line-green); background: #fff; }
+    .del-btn { background: #ff4d4f; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .del-btn:hover { background: #d9363e; }
+    .add-row-btn { background: #f0f0f0; border: 1px dashed #ccc; padding: 10px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; color: #555; margin-bottom: 20px; }
+    .add-row-btn:hover { background: #e8e8e8; }
+
+    /* Excel 操作區 */
+    .excel-group { display: flex; gap: 10px; margin-bottom: 20px; background: #e6f7ff; padding: 15px; border-radius: 8px; border: 1px solid #91d5ff; }
+    .excel-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; }
+    .btn-download { background: var(--btn-blue); }
+    .btn-import { background: var(--line-dark); }
+
+    .save-btn { background: var(--line-green); color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 15px; cursor: pointer; }
+    .backup-group { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
+    .backup-btn { flex: 1; padding: 10px; border: 1px solid var(--line-green); background: white; color: var(--line-green); border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .help-text { font-size: 12px; color: #888; margin-top: 4px; margin-bottom: 10px; }
+    
+    /* 發送紀錄樣式 */
+    .history-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+    .history-time { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .history-to { font-size: 14px; font-weight: bold; color: var(--line-dark); margin-bottom: 4px; }
+    .history-text { font-size: 14px; color: #444; white-space: pre-wrap; }
+    .no-history { text-align: center; color: #999; padding: 20px 0; }
+
+    footer { text-align: center; font-size: 13px; color: #777; margin-top: 30px; line-height: 1.6; }
+    footer a { color: var(--line-dark); text-decoration: none; font-weight: bold; display: inline-block; margin-top: 5px; padding: 5px 10px; border: 1px solid #ddd; border-radius: 20px; background: white; }
+    footer a:hover { background: var(--line-green); color: white; border-color: var(--line-green); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>班級事務通知小幫手lite版</h1>
+    <div class="header-btns">
+      <button class="header-btn" onclick="openHistory()">📜 紀錄</button>
+      <button class="header-btn" onclick="openSettings()">⚙️ 控制台</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <label>1. 選擇班級</label>
+      <select id="classSelect" onchange="renderStudents()"></select>
+      <br><br>
+      <label>2. 選擇通知事項</label>
+      <select id="statusSelect"></select>
+      <input type="text" id="customNote" placeholder="輸入接續文字或全新通知 (選填)..." style="margin-top: 10px;">
+    </div>
+
+    <div class="card">
+      <label>3. 點擊發送對象 (單選確認)</label>
+      <div class="grid-container" id="studentGrid"></div>
+      <button id="btnWholeClass" class="btn-whole-class" onclick="selectWholeClass(this)">📢 全班 (不載入學生姓名)</button>
+    </div>
+
+    <div class="card" id="previewCard" style="display:none; border-left: 4px solid var(--line-green);">
+      <label>4. 確認與編輯發送內容：</label>
+      <div class="help-text">您可直接在此方塊內修改文字，確認無誤後再點擊下方按鈕發送。</div>
+      <textarea id="msgPreview" rows="5" style="border: 1px solid var(--line-green);"></textarea>
+      
+      <div class="action-group">
+        <button class="action-btn btn-copy" onclick="processSend('copy')">📋 複製文字</button>
+        <button class="action-btn btn-line-app" onclick="processSend('lineApp')">💬 發送到 LINE (跳轉 App)</button>
+        <button class="action-btn btn-line-oa" onclick="processSend('lineOA')">🤖 發送到 LINE 官方帳號</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    2026@奕鈞老師製作 lite版 V.7<br>
+    <a href="https://www.facebook.com/profile.php?id=61584090122881" target="_blank">👉 追蹤「奕鈞老師」粉專，獲取更多教學神器！</a>
+  </footer>
+
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>⚙️ 系統控制台 (表格編輯模式)</h2>
+        <button class="close-btn" onclick="closeSettings()">×</button>
+      </div>
+
+      <div class="excel-group">
+        <button class="excel-btn btn-download" onclick="downloadExcelTemplate()">📥 下載 Excel 範本檔</button>
+        <input type="file" id="excelUpload" accept=".xlsx, .xls" style="display:none;" onchange="importExcel(event)">
+        <button class="excel-btn btn-import" onclick="document.getElementById('excelUpload').click()">📤 匯入 Excel 檔案</button>
+      </div>
+      
+      <label>🧑‍🎓 學生名單</label>
+      <div class="table-container">
+        <table id="studentsTable">
+          <thead>
+            <tr><th width="25%">班級</th><th width="25%">座號</th><th width="35%">姓名</th><th width="15%">操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="add-row-btn" onclick="addTableRow('studentsTable')">+ 新增一筆學生</button>
+
+      <label>📝 通知事項</label>
+      <div class="table-container">
+        <table id="statusesTable">
+          <thead>
+            <tr><th width="30%">分類</th><th width="55%">內容</th><th width="15%">操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="add-row-btn" onclick="addTableRow('statusesTable')">+ 新增一筆通知</button>
+
+      <label>🔗 官方帳號 Webhook 網址 (進階選填)</label>
+      <input type="text" id="settingWebhook" placeholder="https://hook.make.com/...">
+
+      <button class="save-btn" onclick="saveSettings()">💾 儲存表格資料並載入</button>
+
+      <div class="backup-group">
+        <button class="backup-btn" onclick="exportData()">📤 匯出備份代碼</button>
+        <button class="backup-btn" onclick="importData()">📥 貼上代碼還原</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="historyModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📜 在地發送紀錄簿</h2>
+        <button class="close-btn" onclick="closeHistory()">×</button>
+      </div>
+      <div class="help-text">紀錄保存在此瀏覽器中，最多顯示最近 50 筆。</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <script>
+    const defaultStudents = `101,1,周杰倫\n101,2,蔡依林\n101,3,林俊傑\n101,4,鄧紫棋\n101,5,蕭敬騰\n101,6,田馥甄\n101,7,盧廣仲\n101,8,艾怡良\n101,9,韋禮安\n101,10,孫燕姿\n101,11,陳奕迅\n101,12,梁靜茹\n101,13,五月天\n101,14,張惠妹\n202,15,李榮浩\n202,16,楊丞琳\n202,17,許光漢\n202,18,桂綸鎂\n202,19,劉以豪\n202,20,王淨\n202,21,彭于晏\n202,22,舒淇\n202,23,金城武\n202,24,賈靜雯\n202,25,吳慷仁`;
+    const defaultStatuses = `班級共同事項,明日有體育課，請提醒孩子穿著體育服裝到校。
+班級共同事項,今日有發放重要回條，請家長撥冗詳閱並簽名，務必提醒孩子明日交回，謝謝配合。
+班級共同事項,下週即將進行期中評量，請家長協助督促孩子在家複習功課，預祝考試順利！
+班級共同事項,近期天氣變化大，早晚溫差明顯，請家長提醒孩子多帶一件保暖衣物，注意身體健康。
+班級共同事項,本週五晚上為學校班親會，誠摯邀請家長們踴躍參與，一同關心孩子在校的學習狀況！
+正向鼓勵與生活關懷,今天在學校表現非常出色，不僅主動參與課堂討論，學習態度也十分積極，值得大大的鼓勵！ 看到孩子持續進步，老師也感到很欣慰，希望孩子能帶著這份自信繼續加油。
+正向鼓勵與生活關懷,最近在數學課上眼睛閃閃發亮，不僅勇敢舉手發言，答題正確率也提高許多。這份自信的建立對孩子很重要，請家長在家也給予肯定！
+正向鼓勵與生活關懷,在今日大掃除時間，負責的區域打掃得一塵不染，展現了極佳的責任感與做事細緻度，值得表揚！
+正向鼓勵與生活關懷,作業完成的速度很快，若能再多花一點心思在字體的工整度上，相信會更能展現他的學習成果。再請家長協助提醒孩子靜下心書寫，期待看到他優質的作品。
+生活作息與突發狀況,今天在校反應身體不舒服，老師已先帶孩子前往健康中心休息並觀察。請家長回家後多留意孩子的後續狀況，若仍有不適，建議多休息。祝福孩子早日康復。
+生活作息與突發狀況,今日尚未到校，想與您確認孩子是否身體不適或需辦理請假手續？若有相關需求，再請家長撥冗回覆或致電學校告知，謝謝您的配合。
+生活作息與突發狀況,最近在校與老師互動良好，但這幾天觀察到他上課時精神不佳，老師有些擔心。再請家長協助留意孩子的居家作息與睡眠品質，確保孩子有充沛的體力應付校園生活，辛苦了。
+生活作息與突發狀況,平時是個活潑的孩子，不過今日在校發生了一些違規狀況。為了完整說明細節並與您商討輔導方式，老師稍晚會再親自致電說明。希望能透過親師共同引導，幫助孩子學習更妥適的行為方式。
+生活作息與突發狀況,今日主動協助受傷的同學前往健康中心，這份熱心助人的特質非常難得，老師與同學都很感謝他的付出，是班上的小暖男/小天使！
+生活作息與突發狀況,今天上課時顯得有些疲累，偶爾會提到遊戲內容。老師擔心過度使用3C產品會影響孩子的專注力與視力，建議家長與孩子約定每日使用時間，共同守護孩子的健康。
+生活作息與突發狀況,今天情緒較為波動，在校與同學發生了一點口角。老師已引導孩子練習『先停下來、再溝通』，請家長回家後也多觀察孩子的心情，若有需要分享的細節，隨時與老師聯絡。
+生活作息與突發狀況,抵達教室時已接近第一節課，這可能會讓他錯過晨間重要的宣導事項。為了讓孩子有充裕的時間沉澱心情迎接學習，請家長協助引導孩子調整早晨出門的時間，謝謝您的配合。
+學習習慣與常規提醒,最近在校與同學相處融洽，不過老師發現孩子的作業有遺漏狀況。為了培養孩子的責任感，請家長協助提醒並確認孩子的書寫狀況，讓我們一起陪伴孩子建立良好的學習習慣。
+學習習慣與常規提醒,最近在校與同學相處融洽，不過老師發現孩子的聯絡簿有遺漏狀況。為了培養孩子的責任感，請家長協助提醒並確認孩子的書寫狀況，讓我們一起陪伴孩子建立良好的學習習慣。
+學習習慣與常規提醒,今日上課態度認真，可惜忘了帶課本，稍稍影響了學習節奏。建議家長在睡前能提醒孩子再次整理書包，養成檢查學用品的習慣，相信這會讓他的學習更加順暢。
+學習習慣與常規提醒,今日上課態度認真，可惜忘了帶課文具，稍稍影響了學習節奏。建議家長在睡前能提醒孩子再次整理書包，養成檢查學用品的習慣，相信這會讓他的學習更加順暢。
+學習習慣與常規提醒,孩子近期在校參與度高，唯打掃時間容易因與同學聊天而分心。老師已提醒孩子『先完成份內工作再休息』，也請家長在家協助引導孩子做家事的習慣，培養責任心。
+學習習慣與常規提醒,這次考卷反應出部分觀念尚未完全吸收，訂正與檢討是進步的關鍵。請家長協助督促孩子將錯誤處重新思考並完成訂正，確保基礎扎實，辛苦了。`;
+
+    let currentData = { classes: {}, statuses: {}, webhook: "" };
+    let selectedStudent = "";
+    let isWholeClass = false; 
+
+    window.onload = function() { loadData(); renderApp(); };
+
+    function loadData() {
+      let rawStudents = localStorage.getItem("app_students_lite") || localStorage.getItem("app_students_v6") || defaultStudents;
+      let rawStatuses = localStorage.getItem("app_statuses_lite") || localStorage.getItem("app_statuses_v6") || defaultStatuses;
+      currentData.webhook = localStorage.getItem("app_webhook_lite") || localStorage.getItem("app_webhook_v6") || "";
+
+      currentData.classes = {};
+      rawStudents.split('\n').forEach(line => {
+        let parts = line.split(',');
+        if (parts.length >= 3) {
+          let cls = parts[0].trim(), no = parts[1].trim(), name = parts[2].trim();
+          if(cls && name) {
+            if (!currentData.classes[cls]) currentData.classes[cls] = [];
+            currentData.classes[cls].push({ no, name });
+          }
+        }
+      });
+
+      currentData.statuses = {};
+      rawStatuses.split('\n').forEach(line => {
+        let parts = line.split(',');
+        if (parts.length >= 2) {
+          let cat = parts[0].trim(), item = parts[1].trim();
+          if(cat && item) {
+            if (!currentData.statuses[cat]) currentData.statuses[cat] = [];
+            currentData.statuses[cat].push(item);
+          }
+        }
+      });
+    }
+
+    function renderApp() {
+      let clsSelect = document.getElementById('classSelect');
+      let currentCls = clsSelect.value;
+      clsSelect.innerHTML = '';
+      Object.keys(currentData.classes).forEach(cls => { clsSelect.add(new Option(cls + " 班", cls)); });
+      if(currentCls && currentData.classes[currentCls]) clsSelect.value = currentCls;
+
+      let statusSelect = document.getElementById('statusSelect');
+      let currentStatus = statusSelect.value;
+      statusSelect.innerHTML = '';
+      Object.keys(currentData.statuses).forEach(cat => {
+        let group = document.createElement('optgroup');
+        group.label = cat;
+        currentData.statuses[cat].forEach(item => { group.appendChild(new Option(item, item)); });
+        statusSelect.add(group);
+      });
+      let customGroup = document.createElement('optgroup');
+      customGroup.label = "自訂功能";
+      customGroup.appendChild(new Option("其他/自訂 (下方完整填寫)", "其他/自訂"));
+      statusSelect.add(customGroup);
+      
+      let options = Array.from(statusSelect.options).map(o => o.value);
+      if(options.includes(currentStatus)) statusSelect.value = currentStatus;
+
+      renderStudents();
+    }
+
+    function renderStudents() {
+      let cls = document.getElementById('classSelect').value;
+      let grid = document.getElementById('studentGrid');
+      grid.innerHTML = '';
+      document.getElementById('previewCard').style.display = 'none';
+      
+      selectedStudent = ""; isWholeClass = false;
+      document.getElementById('btnWholeClass').classList.remove('selected-whole');
+
+      if (!currentData.classes[cls]) return;
+
+      currentData.classes[cls].forEach(student => {
+        let btn = document.createElement('button');
+        btn.className = 'student-btn';
+        btn.innerHTML = `<span class="btn-no">${student.no}</span><span class="btn-name">${student.name}</span>`;
+        btn.onclick = () => selectStudent(btn, student.name);
+        grid.appendChild(btn);
+      });
+    }
+
+    function selectStudent(btnElement, name) {
+      document.querySelectorAll('.student-btn').forEach(b => b.classList.remove('selected'));
+      document.getElementById('btnWholeClass').classList.remove('selected-whole');
+      btnElement.classList.add('selected');
+      selectedStudent = name; isWholeClass = false;
+      updatePreviewField(); showPreviewCard();
+    }
+
+    function selectWholeClass(btnElement) {
+      document.querySelectorAll('.student-btn').forEach(b => b.classList.remove('selected'));
+      btnElement.classList.add('selected-whole');
+      selectedStudent = ""; isWholeClass = true;
+      updatePreviewField(); showPreviewCard();
+    }
+
+    function showPreviewCard() {
+      document.getElementById('previewCard').style.display = 'block';
+      document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    document.getElementById('statusSelect').addEventListener('change', () => { if(selectedStudent || isWholeClass) updatePreviewField(); });
+    document.getElementById('customNote').addEventListener('input', () => { if(selectedStudent || isWholeClass) updatePreviewField(); });
+
+    function updatePreviewField() {
+      let status = document.getElementById('statusSelect').value;
+      let note = document.getElementById('customNote').value.trim();
+      let coreContent = (status === "其他/自訂" && note !== "") ? note : ((note !== "") ? status + note : status);
+      
+      let finalMessage = isWholeClass ? ("各位家長您好，" + coreContent) : ("家長您好，" + selectedStudent + " " + coreContent);
+      document.getElementById('msgPreview').value = finalMessage;
+    }
+
+    function saveToHistory(recipient, msg) {
+      let history = JSON.parse(localStorage.getItem('app_history_lite') || localStorage.getItem('app_history_v6') || '[]');
+      let now = new Date();
+      let timeStr = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      history.unshift({ time: timeStr, to: recipient, text: msg });
+      if (history.length > 50) history.pop(); 
+      localStorage.setItem('app_history_lite', JSON.stringify(history));
+    }
+
+    function processSend(type) {
+      let finalMsg = document.getElementById('msgPreview').value.trim();
+      if(!finalMsg) { alert("訊息不可為空！"); return; }
+      
+      let recipient = isWholeClass ? "全班通知" : selectedStudent;
+
+      if (type === 'copy') {
+        navigator.clipboard.writeText(finalMsg).then(() => {
+          alert("✅ 文字已複製！您可以直接貼上。");
+          saveToHistory(recipient, finalMsg);
+          promptSaveEditedStatus(finalMsg);
+        }).catch(err => alert("複製失敗：" + err));
+      } 
+      else if (type === 'lineApp') {
+        window.open('https://line.me/R/msg/text/?' + encodeURIComponent(finalMsg), '_blank');
+        saveToHistory(recipient, finalMsg);
+        promptSaveEditedStatus(finalMsg);
+      } 
+      else if (type === 'lineOA') {
+        if (!currentData.webhook) { alert("⚠️ 請先至【控制台】設定 Webhook 網址。"); return; }
+        fetch(currentData.webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: finalMsg }) })
+        .then(res => { alert("已發送請求至 Webhook！"); saveToHistory(recipient, finalMsg); promptSaveEditedStatus(finalMsg); })
+        .catch(err => alert("發送失敗：" + err));
+      }
+    }
+
+    function promptSaveEditedStatus(sentMsg) {
+      let coreContent = sentMsg;
+      if (isWholeClass) coreContent = coreContent.replace(/^各位家長您好，/, '').trim();
+      else coreContent = coreContent.replace(new RegExp(`^家長您好，${selectedStudent}\\s?`), '').trim();
+
+      if (!coreContent) return;
+      let exists = false;
+      for (let cat in currentData.statuses) { if (currentData.statuses[cat].includes(coreContent)) { exists = true; break; } }
+
+      if (!exists) {
+        setTimeout(() => {
+          if (confirm("✨ 發現新編輯的內容！\n請問是否要將以下文字加入「常用通知事項」中？\n\n" + coreContent)) {
+            let catName = prompt("請為這個通知輸入一個「分類名稱」：", "自訂新增事項");
+            if (catName) {
+              if (!currentData.statuses[catName]) currentData.statuses[catName] = [];
+              currentData.statuses[catName].push(coreContent);
+              
+              let newStatusesStr = "";
+              for (let c in currentData.statuses) { currentData.statuses[c].forEach(item => { newStatusesStr += c + "," + item + "\n"; }); }
+              localStorage.setItem("app_statuses_lite", newStatusesStr.trim());
+              renderApp();
+              alert("✅ 已成功加入常用清單！");
+              document.getElementById('customNote').value = "";
+            }
+          }
+        }, 500);
+      }
+    }
+
+    function openHistory() {
+      let history = JSON.parse(localStorage.getItem('app_history_lite') || localStorage.getItem('app_history_v6') || '[]');
+      let listHtml = history.length === 0 ? "<div class='no-history'>尚無發送紀錄</div>" : "";
+      history.forEach(item => {
+        listHtml += `<div class='history-item'><div class='history-time'>🕒 ${item.time}</div><div class='history-to'>👤 傳送給：${item.to}</div><div class='history-text'>${item.text}</div></div>`;
+      });
+      document.getElementById('historyList').innerHTML = listHtml;
+      document.getElementById('historyModal').style.display = 'flex';
+    }
+    function closeHistory() { document.getElementById('historyModal').style.display = 'none'; }
+
+    // --- 控制台表格與 Excel 邏輯 ---
+    function openSettings() {
+      document.getElementById('settingWebhook').value = currentData.webhook;
+      
+      // 載入學生表格
+      let stuTbody = document.querySelector('#studentsTable tbody');
+      stuTbody.innerHTML = '';
+      let rawStudents = localStorage.getItem("app_students_lite") || localStorage.getItem("app_students_v6") || defaultStudents;
+      rawStudents.split('\n').forEach(line => {
+        let p = line.split(',');
+        if (p.length >= 3) addTableRow('studentsTable', p[0].trim(), p[1].trim(), p[2].trim());
+      });
+
+      // 載入事項表格
+      let statTbody = document.querySelector('#statusesTable tbody');
+      statTbody.innerHTML = '';
+      let rawStatuses = "";
+      for (let c in currentData.statuses) { currentData.statuses[c].forEach(item => { rawStatuses += c + "," + item + "\n"; }); }
+      if(!rawStatuses) rawStatuses = defaultStatuses;
+      rawStatuses.split('\n').forEach(line => {
+        let p = line.split(',');
+        if (p.length >= 2) addTableRow('statusesTable', p[0].trim(), p[1].trim());
+      });
+
+      document.getElementById('settingsModal').style.display = 'flex';
+    }
+    function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+
+    function addTableRow(tableId, val1='', val2='', val3='') {
+      let tbody = document.querySelector(`#${tableId} tbody`);
+      let tr = document.createElement('tr');
+      if (tableId === 'studentsTable') {
+        tr.innerHTML = `
+          <td><input type="text" value="${val1}" placeholder="例: 101"></td>
+          <td><input type="text" value="${val2}" placeholder="例: 1"></td>
+          <td><input type="text" value="${val3}" placeholder="例: 王小明"></td>
+          <td style="text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">刪除</button></td>`;
+      } else {
+        tr.innerHTML = `
+          <td><input type="text" value="${val1}" placeholder="例: 常規提醒"></td>
+          <td><input type="text" value="${val2}" placeholder="輸入通知內容..."></td>
+          <td style="text-align:center;"><button class="del-btn" onclick="this.closest('tr').remove()">刪除</button></td>`;
+      }
+      tbody.appendChild(tr);
+    }
+
+    function saveSettings() {
+      // 從表格抓取學生資料
+      let studentsArr = [];
+      document.querySelectorAll('#studentsTable tbody tr').forEach(tr => {
+        let inputs = tr.querySelectorAll('input');
+        let cls = inputs[0].value.replace(/,/g, '，').trim();
+        let no = inputs[1].value.replace(/,/g, '，').trim();
+        let name = inputs[2].value.replace(/,/g, '，').trim();
+        if (cls && name) studentsArr.push(`${cls},${no},${name}`);
+      });
+      
+      // 從表格抓取事項資料
+      let statusesArr = [];
+      document.querySelectorAll('#statusesTable tbody tr').forEach(tr => {
+        let inputs = tr.querySelectorAll('input');
+        let cat = inputs[0].value.replace(/,/g, '，').trim();
+        let content = inputs[1].value.replace(/,/g, '，').trim();
+        if (cat && content) statusesArr.push(`${cat},${content}`);
+      });
+
+      let webhook = document.getElementById('settingWebhook').value.trim();
+
+      if (studentsArr.length === 0 || statusesArr.length === 0) {
+        alert("⚠️ 學生名單與通知事項不能為空！"); return;
+      }
+
+      localStorage.setItem("app_students_lite", studentsArr.join('\n'));
+      localStorage.setItem("app_statuses_lite", statusesArr.join('\n'));
+      localStorage.setItem("app_webhook_lite", webhook);
+
+      loadData(); renderApp(); closeSettings();
+      alert("✅ 設定已儲存！");
+    }
+
+    // Excel 範本下載
+    function downloadExcelTemplate() {
+      if(typeof XLSX === 'undefined') { alert("載入套件中，請稍後再試。"); return; }
+      
+      // 取得目前的資料來做範本 (如果沒有就用空的標題)
+      let studentsData = [["班級", "座號", "姓名"]];
+      document.querySelectorAll('#studentsTable tbody tr').forEach(tr => {
+        let inputs = tr.querySelectorAll('input');
+        if(inputs[0].value || inputs[2].value) studentsData.push([inputs[0].value, inputs[1].value, inputs[2].value]);
+      });
+      if(studentsData.length === 1) studentsData.push(["101", "1", "王小明"]);
+
+      let statusesData = [["分類", "內容"]];
+      document.querySelectorAll('#statusesTable tbody tr').forEach(tr => {
+        let inputs = tr.querySelectorAll('input');
+        if(inputs[0].value || inputs[1].value) statusesData.push([inputs[0].value, inputs[1].value]);
+      });
+      if(statusesData.length === 1) statusesData.push(["常規提醒", "作業還沒交。"]);
+
+      const wb = XLSX.utils.book_new();
+      const wsStudents = XLSX.utils.aoa_to_sheet(studentsData);
+      const wsStatuses = XLSX.utils.aoa_to_sheet(statusesData);
+      
+      XLSX.utils.book_append_sheet(wb, wsStudents, "學生名單");
+      XLSX.utils.book_append_sheet(wb, wsStatuses, "通知事項");
+      XLSX.writeFile(wb, "班級事務通知_資料範本.xlsx");
+    }
+
+    // Excel 匯入
+    function importExcel(event) {
+      const file = event.target.files[0];
+      if(!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, {type: 'array'});
+          
+          let importCount = 0;
+
+          if(workbook.Sheets["學生名單"]) {
+            const studentJson = XLSX.utils.sheet_to_json(workbook.Sheets["學生名單"], {header:1});
+            let stuTbody = document.querySelector('#studentsTable tbody');
+            stuTbody.innerHTML = '';
+            for(let i=1; i<studentJson.length; i++) {
+               let row = studentJson[i];
+               if(row.length >= 1 && (row[0] || row[2])) {
+                 addTableRow('studentsTable', row[0]||'', row[1]||'', row[2]||'');
+                 importCount++;
+               }
+            }
+          } else { alert("找不到名稱為「學生名單」的工作表。"); }
+
+          if(workbook.Sheets["通知事項"]) {
+            const statusJson = XLSX.utils.sheet_to_json(workbook.Sheets["通知事項"], {header:1});
+            let statTbody = document.querySelector('#statusesTable tbody');
+            statTbody.innerHTML = '';
+            for(let i=1; i<statusJson.length; i++) {
+               let row = statusJson[i];
+               if(row.length >= 2 && row[0] && row[1]) {
+                 addTableRow('statusesTable', row[0]||'', row[1]||'');
+                 importCount++;
+               }
+            }
+          } else { alert("找不到名稱為「通知事項」的工作表。"); }
+
+          if(importCount > 0) alert("🎉 成功匯入資料至表格中！\n請確認無誤後點擊最下方的「儲存表格資料並載入」。");
+          
+        } catch(err) {
+          alert("解析 Excel 失敗，請確認檔案格式是否正確。");
+        }
+        // 清除 input file 以便下次重複匯入同檔名
+        document.getElementById('excelUpload').value = ""; 
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // 相容舊版代碼匯出匯入
+    function exportData() {
+      let data = {
+        students: localStorage.getItem("app_students_lite") || defaultStudents,
+        statuses: localStorage.getItem("app_statuses_lite") || defaultStatuses,
+        webhook: document.getElementById('settingWebhook').value.trim()
+      };
+      navigator.clipboard.writeText(JSON.stringify(data)).then(() => alert("✅ 備份代碼已複製！")).catch(err => alert("複製失敗"));
+    }
+    function importData() {
+      let code = prompt("📥 請在此貼上您的備份代碼：");
+      if (!code) return;
+      try {
+        let data = JSON.parse(code);
+        if (data.students && data.statuses) {
+          localStorage.setItem("app_students_lite", data.students);
+          localStorage.setItem("app_statuses_lite", data.statuses);
+          if(data.webhook) localStorage.setItem("app_webhook_lite", data.webhook);
+          loadData(); openSettings(); // 重新整理表格
+          alert("🎉 匯入成功！資料已填入表格。");
+        }
+      } catch(e) { alert("❌ 代碼無效。"); }
+    }
+  </script>
+</body>
+</html>
