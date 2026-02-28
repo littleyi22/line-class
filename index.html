@@ -39,7 +39,7 @@
     .student-btn.selected .btn-no { color: #E0F2F1; }
     .btn-name { font-size: 16px; font-weight: bold; }
 
-    .btn-whole-class { width: 100%; padding: 12px; border: 2px dashed #ccc; border-radius: 8px; background-color: #fafafa; color: #555; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: all 0.2s; }
+    .btn-whole-class { width: 100%; padding: 12px; border: 2px dashed #ccc; border-radius: 8px; background-color: #fafafa; color: #555; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
     .btn-whole-class:hover { border-color: var(--line-green); color: var(--line-green); }
     .btn-whole-class.selected-whole { background-color: var(--line-green); color: white; border: 2px solid var(--line-green); }
 
@@ -50,14 +50,13 @@
     .btn-line-app { background-color: var(--line-green); }
     .btn-line-oa { background-color: var(--btn-dark-green); }
 
-    /* Modal & Table 樣式 (加寬以容納表格) */
+    /* Modal & Table 樣式 */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; justify-content: center; align-items: center; }
     .modal-content { background: white; width: 95%; max-width: 800px; max-height: 90vh; border-radius: 12px; padding: 20px; overflow-y: auto; box-sizing: border-box; }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .modal-header h2 { margin: 0; font-size: 18px; color: var(--line-dark); }
     .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #888; }
     
-    /* 表格樣式 */
     .table-container { max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
     table { width: 100%; border-collapse: collapse; min-width: 400px; }
     th { background-color: #f4f4f4; padding: 10px; text-align: left; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; }
@@ -69,7 +68,6 @@
     .add-row-btn { background: #f0f0f0; border: 1px dashed #ccc; padding: 10px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; color: #555; margin-bottom: 20px; }
     .add-row-btn:hover { background: #e8e8e8; }
 
-    /* Excel 操作區 */
     .excel-group { display: flex; gap: 10px; margin-bottom: 20px; background: #e6f7ff; padding: 15px; border-radius: 8px; border: 1px solid #91d5ff; }
     .excel-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; }
     .btn-download { background: var(--btn-blue); }
@@ -115,7 +113,9 @@
     <div class="card">
       <label>3. 點擊發送對象 (單選確認)</label>
       <div class="grid-container" id="studentGrid"></div>
+      
       <button id="btnWholeClass" class="btn-whole-class" onclick="selectWholeClass(this)">📢 全班 (不載入學生姓名)</button>
+      <button id="btnNoGreeting" class="btn-whole-class" onclick="selectNoGreeting(this)">🔕 純文字 (不載入任何稱呼)</button>
     </div>
 
     <div class="card" id="previewCard" style="display:none; border-left: 4px solid var(--line-green);">
@@ -132,7 +132,7 @@
   </div>
 
   <footer>
-    2026@奕鈞老師製作 lite版 V.7<br>
+    2026@奕鈞老師製作 lite版 V.8<br>
     <a href="https://www.facebook.com/profile.php?id=61584090122881" target="_blank">👉 追蹤「奕鈞老師」粉專，獲取更多教學神器！</a>
   </footer>
 
@@ -189,7 +189,10 @@
         <h2>📜 在地發送紀錄簿</h2>
         <button class="close-btn" onclick="closeHistory()">×</button>
       </div>
-      <div class="help-text">紀錄保存在此瀏覽器中，最多顯示最近 50 筆。</div>
+      
+      <button class="action-btn btn-copy" onclick="downloadHistoryExcel()" style="margin-bottom: 15px;">📥 下載紀錄為 Excel 檔</button>
+      
+      <div class="help-text">紀錄保存在此瀏覽器中，最多顯示最近 500 筆。</div>
       <div id="historyList"></div>
     </div>
   </div>
@@ -223,13 +226,14 @@
     let currentData = { classes: {}, statuses: {}, webhook: "" };
     let selectedStudent = "";
     let isWholeClass = false; 
+    let isNoGreeting = false; // ★ 新增：無稱呼狀態
 
     window.onload = function() { loadData(); renderApp(); };
 
     function loadData() {
-      let rawStudents = localStorage.getItem("app_students_lite") || localStorage.getItem("app_students_v6") || defaultStudents;
-      let rawStatuses = localStorage.getItem("app_statuses_lite") || localStorage.getItem("app_statuses_v6") || defaultStatuses;
-      currentData.webhook = localStorage.getItem("app_webhook_lite") || localStorage.getItem("app_webhook_v6") || "";
+      let rawStudents = localStorage.getItem("app_students_lite") || defaultStudents;
+      let rawStatuses = localStorage.getItem("app_statuses_lite") || defaultStatuses;
+      currentData.webhook = localStorage.getItem("app_webhook_lite") || "";
 
       currentData.classes = {};
       rawStudents.split('\n').forEach(line => {
@@ -289,8 +293,9 @@
       grid.innerHTML = '';
       document.getElementById('previewCard').style.display = 'none';
       
-      selectedStudent = ""; isWholeClass = false;
+      selectedStudent = ""; isWholeClass = false; isNoGreeting = false;
       document.getElementById('btnWholeClass').classList.remove('selected-whole');
+      document.getElementById('btnNoGreeting').classList.remove('selected-whole');
 
       if (!currentData.classes[cls]) return;
 
@@ -306,15 +311,25 @@
     function selectStudent(btnElement, name) {
       document.querySelectorAll('.student-btn').forEach(b => b.classList.remove('selected'));
       document.getElementById('btnWholeClass').classList.remove('selected-whole');
+      document.getElementById('btnNoGreeting').classList.remove('selected-whole');
       btnElement.classList.add('selected');
-      selectedStudent = name; isWholeClass = false;
+      selectedStudent = name; isWholeClass = false; isNoGreeting = false;
       updatePreviewField(); showPreviewCard();
     }
 
     function selectWholeClass(btnElement) {
       document.querySelectorAll('.student-btn').forEach(b => b.classList.remove('selected'));
+      document.getElementById('btnNoGreeting').classList.remove('selected-whole');
       btnElement.classList.add('selected-whole');
-      selectedStudent = ""; isWholeClass = true;
+      selectedStudent = ""; isWholeClass = true; isNoGreeting = false;
+      updatePreviewField(); showPreviewCard();
+    }
+
+    function selectNoGreeting(btnElement) {
+      document.querySelectorAll('.student-btn').forEach(b => b.classList.remove('selected'));
+      document.getElementById('btnWholeClass').classList.remove('selected-whole');
+      btnElement.classList.add('selected-whole');
+      selectedStudent = ""; isWholeClass = false; isNoGreeting = true;
       updatePreviewField(); showPreviewCard();
     }
 
@@ -323,24 +338,33 @@
       document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
 
-    document.getElementById('statusSelect').addEventListener('change', () => { if(selectedStudent || isWholeClass) updatePreviewField(); });
-    document.getElementById('customNote').addEventListener('input', () => { if(selectedStudent || isWholeClass) updatePreviewField(); });
+    document.getElementById('statusSelect').addEventListener('change', () => { if(selectedStudent || isWholeClass || isNoGreeting) updatePreviewField(); });
+    document.getElementById('customNote').addEventListener('input', () => { if(selectedStudent || isWholeClass || isNoGreeting) updatePreviewField(); });
 
     function updatePreviewField() {
       let status = document.getElementById('statusSelect').value;
       let note = document.getElementById('customNote').value.trim();
       let coreContent = (status === "其他/自訂" && note !== "") ? note : ((note !== "") ? status + note : status);
       
-      let finalMessage = isWholeClass ? ("各位家長您好，" + coreContent) : ("家長您好，" + selectedStudent + " " + coreContent);
+      let finalMessage = "";
+      if (isWholeClass) {
+        finalMessage = "各位家長您好，" + coreContent;
+      } else if (isNoGreeting) {
+        finalMessage = coreContent; // ★ 純文字，不加稱呼
+      } else {
+        finalMessage = "家長您好，" + selectedStudent + " " + coreContent;
+      }
       document.getElementById('msgPreview').value = finalMessage;
     }
 
     function saveToHistory(recipient, msg) {
-      let history = JSON.parse(localStorage.getItem('app_history_lite') || localStorage.getItem('app_history_v6') || '[]');
+      let history = JSON.parse(localStorage.getItem('app_history_lite') || '[]');
       let now = new Date();
       let timeStr = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
       history.unshift({ time: timeStr, to: recipient, text: msg });
-      if (history.length > 50) history.pop(); 
+      
+      // ★ 紀錄上限提升至 500 筆
+      if (history.length > 500) history.pop(); 
       localStorage.setItem('app_history_lite', JSON.stringify(history));
     }
 
@@ -348,7 +372,7 @@
       let finalMsg = document.getElementById('msgPreview').value.trim();
       if(!finalMsg) { alert("訊息不可為空！"); return; }
       
-      let recipient = isWholeClass ? "全班通知" : selectedStudent;
+      let recipient = isWholeClass ? "全班通知" : (isNoGreeting ? "純文字通知" : selectedStudent);
 
       if (type === 'copy') {
         navigator.clipboard.writeText(finalMsg).then(() => {
@@ -372,8 +396,13 @@
 
     function promptSaveEditedStatus(sentMsg) {
       let coreContent = sentMsg;
-      if (isWholeClass) coreContent = coreContent.replace(/^各位家長您好，/, '').trim();
-      else coreContent = coreContent.replace(new RegExp(`^家長您好，${selectedStudent}\\s?`), '').trim();
+      if (isWholeClass) {
+          coreContent = coreContent.replace(/^各位家長您好，/, '').trim();
+      } else if (isNoGreeting) {
+          coreContent = coreContent.trim();
+      } else {
+          coreContent = coreContent.replace(new RegExp(`^家長您好，${selectedStudent}\\s?`), '').trim();
+      }
 
       if (!coreContent) return;
       let exists = false;
@@ -399,8 +428,9 @@
       }
     }
 
+    // --- 發送紀錄簿 相關功能 ---
     function openHistory() {
-      let history = JSON.parse(localStorage.getItem('app_history_lite') || localStorage.getItem('app_history_v6') || '[]');
+      let history = JSON.parse(localStorage.getItem('app_history_lite') || '[]');
       let listHtml = history.length === 0 ? "<div class='no-history'>尚無發送紀錄</div>" : "";
       history.forEach(item => {
         listHtml += `<div class='history-item'><div class='history-time'>🕒 ${item.time}</div><div class='history-to'>👤 傳送給：${item.to}</div><div class='history-text'>${item.text}</div></div>`;
@@ -408,22 +438,46 @@
       document.getElementById('historyList').innerHTML = listHtml;
       document.getElementById('historyModal').style.display = 'flex';
     }
+    
     function closeHistory() { document.getElementById('historyModal').style.display = 'none'; }
+
+    // ★ 新增：下載歷史紀錄為 Excel
+    function downloadHistoryExcel() {
+      if(typeof XLSX === 'undefined') { alert("載入套件中，請稍後再試。"); return; }
+      
+      let history = JSON.parse(localStorage.getItem('app_history_lite') || '[]');
+      if (history.length === 0) {
+          alert("目前尚無發送紀錄可供下載。");
+          return;
+      }
+      
+      let data = [["發送時間", "發送對象", "訊息內容"]];
+      history.forEach(item => {
+          data.push([item.time, item.to, item.text]);
+      });
+      
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, "發送紀錄");
+      
+      // 產生日期字串作為檔名
+      let now = new Date();
+      let dateString = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+      XLSX.writeFile(wb, `班級事務通知_發送紀錄_${dateString}.xlsx`);
+    }
 
     // --- 控制台表格與 Excel 邏輯 ---
     function openSettings() {
       document.getElementById('settingWebhook').value = currentData.webhook;
       
-      // 載入學生表格
       let stuTbody = document.querySelector('#studentsTable tbody');
       stuTbody.innerHTML = '';
-      let rawStudents = localStorage.getItem("app_students_lite") || localStorage.getItem("app_students_v6") || defaultStudents;
+      let rawStudents = localStorage.getItem("app_students_lite") || defaultStudents;
       rawStudents.split('\n').forEach(line => {
         let p = line.split(',');
         if (p.length >= 3) addTableRow('studentsTable', p[0].trim(), p[1].trim(), p[2].trim());
       });
 
-      // 載入事項表格
       let statTbody = document.querySelector('#statusesTable tbody');
       statTbody.innerHTML = '';
       let rawStatuses = "";
@@ -457,7 +511,6 @@
     }
 
     function saveSettings() {
-      // 從表格抓取學生資料
       let studentsArr = [];
       document.querySelectorAll('#studentsTable tbody tr').forEach(tr => {
         let inputs = tr.querySelectorAll('input');
@@ -467,7 +520,6 @@
         if (cls && name) studentsArr.push(`${cls},${no},${name}`);
       });
       
-      // 從表格抓取事項資料
       let statusesArr = [];
       document.querySelectorAll('#statusesTable tbody tr').forEach(tr => {
         let inputs = tr.querySelectorAll('input');
@@ -490,11 +542,9 @@
       alert("✅ 設定已儲存！");
     }
 
-    // Excel 範本下載
     function downloadExcelTemplate() {
       if(typeof XLSX === 'undefined') { alert("載入套件中，請稍後再試。"); return; }
       
-      // 取得目前的資料來做範本 (如果沒有就用空的標題)
       let studentsData = [["班級", "座號", "姓名"]];
       document.querySelectorAll('#studentsTable tbody tr').forEach(tr => {
         let inputs = tr.querySelectorAll('input');
@@ -518,7 +568,6 @@
       XLSX.writeFile(wb, "班級事務通知_資料範本.xlsx");
     }
 
-    // Excel 匯入
     function importExcel(event) {
       const file = event.target.files[0];
       if(!file) return;
@@ -528,7 +577,6 @@
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, {type: 'array'});
-          
           let importCount = 0;
 
           if(workbook.Sheets["學生名單"]) {
@@ -562,13 +610,11 @@
         } catch(err) {
           alert("解析 Excel 失敗，請確認檔案格式是否正確。");
         }
-        // 清除 input file 以便下次重複匯入同檔名
         document.getElementById('excelUpload').value = ""; 
       };
       reader.readAsArrayBuffer(file);
     }
 
-    // 相容舊版代碼匯出匯入
     function exportData() {
       let data = {
         students: localStorage.getItem("app_students_lite") || defaultStudents,
@@ -577,6 +623,7 @@
       };
       navigator.clipboard.writeText(JSON.stringify(data)).then(() => alert("✅ 備份代碼已複製！")).catch(err => alert("複製失敗"));
     }
+    
     function importData() {
       let code = prompt("📥 請在此貼上您的備份代碼：");
       if (!code) return;
@@ -586,7 +633,7 @@
           localStorage.setItem("app_students_lite", data.students);
           localStorage.setItem("app_statuses_lite", data.statuses);
           if(data.webhook) localStorage.setItem("app_webhook_lite", data.webhook);
-          loadData(); openSettings(); // 重新整理表格
+          loadData(); openSettings(); 
           alert("🎉 匯入成功！資料已填入表格。");
         }
       } catch(e) { alert("❌ 代碼無效。"); }
