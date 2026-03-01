@@ -32,6 +32,10 @@
     select { appearance: none; -webkit-appearance: none; }
     textarea:focus, input[type="text"]:focus { border-color: var(--line-green); background-color: #fff; }
     
+    /* 分類選單特別樣式 */
+    #categorySelect { background-color: #eaf8f0; border-color: #b7e4c7; color: var(--line-dark); font-weight: bold; margin-bottom: 10px; }
+    #categorySelect:focus { border-color: var(--line-green); background-color: #d1f2dd; }
+
     .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
     .student-btn { background-color: white; border: 1px solid #ddd; padding: 10px 5px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.1s; }
     .student-btn.selected { background-color: var(--line-green); color: white; border-color: var(--line-green); }
@@ -78,7 +82,6 @@
     .backup-btn { flex: 1; padding: 10px; border: 1px solid var(--line-green); background: white; color: var(--line-green); border-radius: 8px; font-weight: bold; cursor: pointer; }
     .help-text { font-size: 12px; color: #888; margin-top: 4px; margin-bottom: 10px; }
     
-    /* 發送紀錄樣式 */
     .history-item { border-bottom: 1px solid #eee; padding: 10px 0; }
     .history-time { font-size: 12px; color: #888; margin-bottom: 4px; }
     .history-to { font-size: 14px; font-weight: bold; color: var(--line-dark); margin-bottom: 4px; }
@@ -105,8 +108,11 @@
       <label>1. 選擇班級</label>
       <select id="classSelect" onchange="renderStudents()"></select>
       <br><br>
-      <label>2. 選擇通知事項</label>
+      
+      <label>2. 選擇通知分類與事項</label>
+      <select id="categorySelect" onchange="renderStatuses()"></select>
       <select id="statusSelect"></select>
+      
       <input type="text" id="customNote" placeholder="輸入接續文字或全新通知 (選填)..." style="margin-top: 10px;">
     </div>
 
@@ -132,7 +138,7 @@
   </div>
 
   <footer>
-    2026@奕鈞老師製作 lite版 V.8<br>
+    2026@奕鈞老師製作 lite版 V.9<br>
     <a href="https://www.facebook.com/profile.php?id=61584090122881" target="_blank">👉 追蹤「奕鈞老師」粉專，獲取更多教學神器！</a>
   </footer>
 
@@ -191,7 +197,6 @@
       </div>
       
       <button class="action-btn btn-copy" onclick="downloadHistoryExcel()" style="margin-bottom: 15px;">📥 下載紀錄為 Excel 檔</button>
-      
       <div class="help-text">紀錄保存在此瀏覽器中，最多顯示最近 500 筆。</div>
       <div id="historyList"></div>
     </div>
@@ -226,7 +231,7 @@
     let currentData = { classes: {}, statuses: {}, webhook: "" };
     let selectedStudent = "";
     let isWholeClass = false; 
-    let isNoGreeting = false; // ★ 新增：無稱呼狀態
+    let isNoGreeting = false; 
 
     window.onload = function() { loadData(); renderApp(); };
 
@@ -261,30 +266,55 @@
     }
 
     function renderApp() {
+      // 1. 班級下拉
       let clsSelect = document.getElementById('classSelect');
       let currentCls = clsSelect.value;
       clsSelect.innerHTML = '';
       Object.keys(currentData.classes).forEach(cls => { clsSelect.add(new Option(cls + " 班", cls)); });
       if(currentCls && currentData.classes[currentCls]) clsSelect.value = currentCls;
 
+      // 2. 分類下拉 (Category)
+      let catSelect = document.getElementById('categorySelect');
+      let currentCat = catSelect.value;
+      catSelect.innerHTML = '';
+      Object.keys(currentData.statuses).forEach(cat => {
+        catSelect.add(new Option(cat, cat));
+      });
+      catSelect.add(new Option("自訂功能", "自訂功能")); // 加上自訂選項
+      
+      let catOptions = Array.from(catSelect.options).map(o => o.value);
+      if(catOptions.includes(currentCat)) catSelect.value = currentCat;
+
+      // 3. 連動產生事項下拉
+      renderStatuses();
+      renderStudents();
+    }
+
+    // ★ V.9 核心功能：切換分類時，更新事項選單
+    function renderStatuses() {
+      let catSelect = document.getElementById('categorySelect');
       let statusSelect = document.getElementById('statusSelect');
       let currentStatus = statusSelect.value;
+      
       statusSelect.innerHTML = '';
-      Object.keys(currentData.statuses).forEach(cat => {
-        let group = document.createElement('optgroup');
-        group.label = cat;
-        currentData.statuses[cat].forEach(item => { group.appendChild(new Option(item, item)); });
-        statusSelect.add(group);
-      });
-      let customGroup = document.createElement('optgroup');
-      customGroup.label = "自訂功能";
-      customGroup.appendChild(new Option("其他/自訂 (下方完整填寫)", "其他/自訂"));
-      statusSelect.add(customGroup);
+      let selectedCat = catSelect.value;
+      
+      if (selectedCat === "自訂功能") {
+        statusSelect.add(new Option("其他/自訂 (下方完整填寫)", "其他/自訂"));
+      } else if (currentData.statuses[selectedCat]) {
+        currentData.statuses[selectedCat].forEach(item => {
+          statusSelect.add(new Option(item, item));
+        });
+      }
       
       let options = Array.from(statusSelect.options).map(o => o.value);
-      if(options.includes(currentStatus)) statusSelect.value = currentStatus;
-
-      renderStudents();
+      if(options.includes(currentStatus)) {
+         statusSelect.value = currentStatus;
+      } else if (options.length > 0) {
+         statusSelect.value = options[0]; // 預設選取第一個
+      }
+      
+      if(selectedStudent || isWholeClass || isNoGreeting) updatePreviewField();
     }
 
     function renderStudents() {
@@ -350,7 +380,7 @@
       if (isWholeClass) {
         finalMessage = "各位家長您好，" + coreContent;
       } else if (isNoGreeting) {
-        finalMessage = coreContent; // ★ 純文字，不加稱呼
+        finalMessage = coreContent; 
       } else {
         finalMessage = "家長您好，" + selectedStudent + " " + coreContent;
       }
@@ -363,7 +393,6 @@
       let timeStr = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
       history.unshift({ time: timeStr, to: recipient, text: msg });
       
-      // ★ 紀錄上限提升至 500 筆
       if (history.length > 500) history.pop(); 
       localStorage.setItem('app_history_lite', JSON.stringify(history));
     }
@@ -411,8 +440,14 @@
       if (!exists) {
         setTimeout(() => {
           if (confirm("✨ 發現新編輯的內容！\n請問是否要將以下文字加入「常用通知事項」中？\n\n" + coreContent)) {
-            let catName = prompt("請為這個通知輸入一個「分類名稱」：", "自訂新增事項");
+            
+            // 讓使用者先選擇「要存入哪個現有分類」或是「輸入新分類」
+            let catOptionsStr = "請輸入分類名稱。\n現有分類參考：\n" + Object.keys(currentData.statuses).join("、");
+            let catName = prompt(catOptionsStr, document.getElementById('categorySelect').value || "自訂新增事項");
+            
             if (catName) {
+              if (catName === "自訂功能") catName = "自訂新增事項"; // 避開系統保留字
+              
               if (!currentData.statuses[catName]) currentData.statuses[catName] = [];
               currentData.statuses[catName].push(coreContent);
               
@@ -420,6 +455,12 @@
               for (let c in currentData.statuses) { currentData.statuses[c].forEach(item => { newStatusesStr += c + "," + item + "\n"; }); }
               localStorage.setItem("app_statuses_lite", newStatusesStr.trim());
               renderApp();
+              
+              // 存檔後自動將選單切換到該分類
+              document.getElementById('categorySelect').value = catName;
+              renderStatuses();
+              document.getElementById('statusSelect').value = coreContent;
+              
               alert("✅ 已成功加入常用清單！");
               document.getElementById('customNote').value = "";
             }
@@ -428,7 +469,6 @@
       }
     }
 
-    // --- 發送紀錄簿 相關功能 ---
     function openHistory() {
       let history = JSON.parse(localStorage.getItem('app_history_lite') || '[]');
       let listHtml = history.length === 0 ? "<div class='no-history'>尚無發送紀錄</div>" : "";
@@ -441,7 +481,6 @@
     
     function closeHistory() { document.getElementById('historyModal').style.display = 'none'; }
 
-    // ★ 新增：下載歷史紀錄為 Excel
     function downloadHistoryExcel() {
       if(typeof XLSX === 'undefined') { alert("載入套件中，請稍後再試。"); return; }
       
@@ -460,13 +499,11 @@
       const ws = XLSX.utils.aoa_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, "發送紀錄");
       
-      // 產生日期字串作為檔名
       let now = new Date();
       let dateString = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
       XLSX.writeFile(wb, `班級事務通知_發送紀錄_${dateString}.xlsx`);
     }
 
-    // --- 控制台表格與 Excel 邏輯 ---
     function openSettings() {
       document.getElementById('settingWebhook').value = currentData.webhook;
       
